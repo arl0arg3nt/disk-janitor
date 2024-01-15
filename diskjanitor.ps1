@@ -1,5 +1,3 @@
-
-
 function TempFileHunter {
 	<# Remove All User Temp Files #>
 	for($i=0; $i -lt $fileNames.count; $i++){ 

@@ -1,39 +1,94 @@
+<#  
+    arl0arg3nt - disk janitor - 2024  
+    
+    GNU GENERAL PUBLIC LICENSE
+    Version 3, 29 June 2007
+
+    Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+    Everyone is permitted to copy and distribute verbatim copies
+    of this license document, but changing it is not allowed.
+#>
+
+$ShouldCleanOldUserFiles = $false
+$ShouldHuntTempFiles = $false
+$ShouldIdentifyUnusedFiles = $false
+
+<# rewrite
+
+	Places To check
+	- "C:\Windows\Temp"
+	- "C:\Users\{USERNAME}\AppData\Local\Temp\"
+	- "C:\Users\{USERNAME}\AppData\Local\Microsoft\Outlook"
+	- "C:\Users\{USERNAME}\AppData\Local\Microsoft\Windows\Temporary Internet Files"
+	$tmp = @(Get-ChildItem -Path C:\ -Filter *.tmp -Recurse -ErrorAction SilentlyContinue -Force | select FullName)
+#>
+
 function TempFileHunter {
-	<# Remove All User Temp Files #>
-	for($i=0; $i -lt $fileNames.count; $i++){ 
-		$selectedFolder = ($fileNames[$i]); 
-		$selectedFolderTempPath = "$targetLocation$selectedFolder\AppData\Local\Temp\"; 
-		if(Test-Path -Path $selectedFolderTempPath -ErrorAction SilentlyContinue){ 
-			$TotalFilesInTargetDir = (Get-ChildItem $selectedFolderTempPath | measure).Count;
-			Remove-Item "$selectedFolderTempPath\*" -recurse -ErrorAction SilentlyContinue;
-			$TotalRemainingFilesInTargetDir = ($TotalFilesInTargetDir - (Get-ChildItem $selectedFolderTempPath | measure).Count);
-			Write-Host "$i : $selectedFolder : $TotalRemainingFilesInTargetDir/$TotalFilesInTargetDir Files Removed in $selectedFolderTempPath"; 
-		} 
-		else{ 
-			Write-Host "$i : No Temp Folder in $selectedFolder"; 
+	if (!$ShouldHuntTempFiles) { return $null; }
+
+	$removedFiles = [System.Collections.ArrayList]@()
+	[System.String]$UserResponse = "$null"
+	$tempFiles = @((Get-ChildItem -Path C:\ -Filter *.tmp -Recurse -ErrorAction SilentlyContinue -Force).FullName);
+	Write-Host $tempFiles.Count;
+	foreach ($tempFile in $tempFiles) {
+		if ([System.String]$UserResponse -ne [System.String]"a") { 
+			[System.String]$UserResponse = Read-Host "$tempFile `r`nWould you like to delete this file? (y = yes, n = No, a = Yes to all) "; 
 		}
-		$selectedFolderTempPath = "$targetLocation$selectedFolder\AppData\Local\Microsoft\Windows\Temporary Internet Files"; 
-		if(Test-Path -Path $selectedFolderTempPath -ErrorAction SilentlyContinue){ 
-			$TotalFilesInTargetDir = (Get-ChildItem $selectedFolderTempPath | measure).Count;
-			Remove-Item "$selectedFolderTempPath\*" -recurse -ErrorAction SilentlyContinue;
-			$TotalRemainingFilesInTargetDir = ($TotalFilesInTargetDir - (Get-ChildItem $selectedFolderTempPath | measure).Count);
-			Write-Host "$i : $selectedFolder : $TotalRemainingFilesInTargetDir/$TotalFilesInTargetDir Files Removed in $selectedFolderTempPath"; 
-		} 
-		else{ 
-			Write-Host "$i : No Temporary Internet Files Found in $selectedFolder"; 
-		} 
+		switch ($UserResponse) {
+			"Y" {
+				$removedFiles.Add($tempFile) *>$null;
+				Remove-Item $tempFile -recurse -ErrorAction SilentlyContinue -Force;
+				$UserResponse = $null
+				break 
+			}
+			"A" {
+				$removedFiles.Add($tempFile) *>$null;
+				Remove-Item $tempFile -recurse -ErrorAction SilentlyContinue -Force;
+				$UserResponse = "a";
+				break 
+			}
+			"N" {
+				$UserResponse = $null; 
+				break 
+			}
+			Default {
+				$UserResponse = $null; 
+				break 
+			}
+			
+		}
 	}
-	Remove-Item $env:WINDIR\Panther\*.tmp -Recurse -ErrorAction SilentlyContinue
-	
-	<# Remove Windows Temp Files #>
-	$selectedFolderTempPath = "$env:WINDIR\Temp\";
-	if(Test-Path -Path $selectedFolderTempPath -erroraction 'silentlycontinue'){ 
-		$TotalFilesInTargetDir = (Get-ChildItem $selectedFolderTempPath | measure).Count;
-		Remove-Item $selectedFolderTempPath -recurse -erroraction 'silentlycontinue'; 
-		$TotalRemainingFilesInTargetDir = ($TotalFilesInTargetDir - (Get-ChildItem $targetLocation | measure).Count);
-		Write-Host "W : $selectedFolderTempPath : $TotalRemainingFilesInTargetDir/$TotalFilesInTargetDir Files Removed in $selectedFolderTempPath"; 
-	} 
-	else{ 
-		Write-Host "No Windows Temp Folder was Found"; 
-	}
+	$UserResponse = $null;
+	Write-Host $removedFiles
 }
+
+function CleanOldUserFiless {
+	if (!$ShouldCleanOldUserFiles) { $null; }
+	$CurrentUser = [System.String](Get-WmiObject Win32_Process -f 'Name="explorer.exe"'  | ForEach-Object  getowner  | ForEach-Object user)
+	$ExclueFromClean = @("$CurrentUser", "admin", "public", "Technical")
+	$FilesToSort = @(Get-ChildItem $targetLocation -Name);
+	$FilesToClean = [System.Collections.ArrayList]@()
+	
+	foreach ($SelectedFile in $FilesToSort) {
+		$_i = 1
+		foreach ($Exclude in $ExclueFromClean) {
+			if ($SelectedFile -notmatch $Exclude) { 
+				Write-Host "testing: "$SelectedFile $Exclude
+				if ($_i -eq ($ExclueFromClean.Count)) { 
+					$FilesToClean.Add($SelectedFile);
+					Write-Host $SelectedFile
+				}
+			}
+			$_i++;
+		}
+		write-host "`r`n"
+	}
+
+	Write-Host "Not Functional";
+}
+
+function IdentifyUnusedFiles {
+	if (!$ShouldIdentifyUnusedFiles) { $null; }
+	Write-Host "Not Functional";
+}
+
